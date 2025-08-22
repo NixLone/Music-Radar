@@ -541,3 +541,56 @@ dialog::backdrop{background:rgba(0,0,0,.35)}
   box-shadow: 0 4px 10px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.04);
   text-decoration:none; color:var(--text); cursor:pointer;
 }
+
+
+/* === Mobile optimizations === */
+@media (max-width: 720px){
+  html, body { overflow-x:hidden; }
+  .wrap{ padding: 12px !important; }
+  header .tools{ gap:8px; }
+  .logo-svg{ width:24px; height:24px; }
+
+  /* Search bar stacks on small screens */
+  .search{ position: static; padding:10px; gap:8px; }
+  .search .row{ display:grid; grid-template-columns: 1fr auto; gap:8px; }
+  .search input[type="text"]{ font-size:16px; padding:10px 12px; }
+  .search .filters{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .select{ padding:8px 10px; font-size:13px; }
+
+  /* Cards more compact */
+  .results{ grid-template-columns: 1fr !important; gap:10px; }
+  .track{ padding:10px; border-radius:14px; }
+  .track .head{ gap:10px; }
+  .track .cover{ width:54px; height:54px; border-radius:10px; }
+  .track .meta .title{ font-size:16px; line-height:1.2; }
+  .track .meta .artist{ font-size:13px; opacity:.85; }
+  .track-buttons{ gap:8px; }
+  .track-buttons .btn, .track-buttons .track-btn, .track-buttons .pill{
+    min-height:34px; padding:6px 10px; font-size:13px;
+  }
+  .track .ext-links{ flex-wrap:wrap; gap:8px; }
+  .track .ext-links a{ font-size:13px; }
+
+  /* Player: bigger tappable controls but lower height */
+  .player{ bottom:0; left:0; right:0; border-radius:14px 14px 0 0; padding:8px 10px; }
+  .player .row{ gap:10px; }
+  .player .cover{ width:44px; height:44px; border-radius:10px; }
+  .icon-btn{ width:42px; height:42px; }
+  .icon-btn svg{ width:20px; height:20px; }
+  .bar{ height:6px; }
+  .time{ font-size:12px; padding:0 6px 8px; }
+
+  /* Tabs */
+  .tabs{ gap:8px; }
+  .tabs .tab{ padding:8px 10px; font-size:14px; }
+
+  /* No horizontal scroll anywhere */
+  .container, .results, .track, .card{ max-width:100%; min-width:0; }
+}
+
+/* Smaller handhelds */
+@media (max-width: 380px){
+  .search .filters{ grid-template-columns: 1fr; }
+  .track .meta .title{ font-size:15px; }
+  .track-buttons{ flex-wrap:wrap; }
+}
