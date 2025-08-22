@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="auto">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Music Finder</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div class="menu-buttons" style="text-align:center;">
+<button onclick="showTab('search')">🔍 Поиск</button>
+<button onclick="showTab('favorites')">⭐ Избранное</button>
+<button onclick="showTab('playlist')">🎵 Плейлист</button>
+</div>
+
+  <div class="container">
+    <header>
+      <div class="brand">
+        <svg class="logo-svg" aria-hidden="true" width="28" height="28" viewBox="0 0 28 28">
+  <defs>
+    <mask id="logoHole"><rect width="28" height="28" fill="white"/><circle cx="14" cy="14" r="8" fill="black"/></mask>
+  </defs>
+  <circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2"/>
+  <g class="sweep" mask="url(#logoHole)">
+    <path d="M14 14 L26 14 A12 12 0 0 0 14 2 Z" fill="currentColor" opacity="0.25"/>
+  </g>
+</svg>
+        <div>Music Finder</div>
+      </div>
+      <div class="tools">
+        <select id="lang" class="select"><option value="ru">RU</option><option value="en">EN</option></select>
+        <select id="theme" class="select"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select>
+        <button id="openStats" class="btn">📈</button>
+      </div>
+    </header>
+
+    <div id="tab-search">
+      <div class="search">
+        <div class="ac-wrap">
+          <input id="q" type="text" inputmode="search" placeholder="Введите название песни или исполнителя" autocomplete="off"/>
+          <div id="ac" class="ac-list"></div>
+        </div>
+        <button id="go" class="btn">Поиск</button>
+        <button id="clear" class="btn">Очистить</button>
+      </div>
+
+      <div class="status">
+        <div><span id="statusText">Готов.</span> <span id="source" style="margin-left:8px;font-size:12px;opacity:.8"></span></div>
+        <div class="filters">
+          <select id="fArtist" class="select"><option value="">Выбрать исполнителя</option></select>
+          <select id="fAlbum"  class="select"><option value="">Выбрать альбом</option></select>
+          <select id="sort"    class="select">
+            <option value="relevance">Сорт: По релевантности</option>
+            <option value="title">Название</option>
+            <option value="artist">Артист</option>
+            <option value="duration">Длительность</option>
+            <option value="source">Источник</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="results" class="results"></div>
+      <div id="moreWrap" style="text-align:center;margin-top:16px;display:none;"><button id="more" class="btn">Показать ещё</button></div>
+    </div>
+
+    <div id="tab-favorites" style="display:none;">
+      <h3>Избранное</h3>
+      <div id="favorites"></div>
+    </div>
+
+    <div id="tab-playlist" style="display:none;">
+      <h3>Плейлисты</h3>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0 12px;">
+        <input id="plNameInput" class="select" style="min-width:220px;" placeholder="Название плейлиста"/>
+        <button id="createPlBtn" class="btn">Создать плейлист</button>
+        <select id="plSelect" class="select"><option value="">Выбрать плейлист</option></select>
+<span id="plCountBadge" class="badge">0</span>
+<button id="renamePlBtn" class="btn">Переименовать</button>
+<button id="deletePlBtn" class="btn" style="background:linear-gradient(135deg,#ef4444,#f97316)">Удалить</button>
+<button id="clearPlBtn" class="btn" style="background:linear-gradient(135deg,#f59e0b,#f97316)">Очистить</button>
+      </div>
+      <div id="playlistTracks"></div>
+    </div>
+
+    <div class="footer" style="text-align:center;color:var(--muted);margin-top:28px;font-size:13px">
+      Превью — iTunes/Deezer (≈30 сек). Полные треки не распространяются.
+    </div>
+  </div>
+
+  <!-- Мини-плеер -->
+  <div id="player" class="player" role="region" aria-label="Мини-плеер">
+    <div class="row">
+      <div id="pCover" class="cover" style="background:#0b1224"></div>
+      <div class="meta"><p id="pTitle" class="t">—</p><p id="pArtist" class="s">—</p></div>
+      <div class="controls">
+        <!-- Prev -->
+        <button id="btnPrev" class="icon-btn" aria-label="Предыдущий трек">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="5" width="2" height="14" rx="1" fill="currentColor"></rect>
+            <polygon points="15,6 7,12 15,18" fill="currentColor"></polygon>
+          </svg>
+        </button>
+        <!-- Play / Pause -->
+        <button id="btnPlay" class="icon-btn" aria-label="Пауза/Воспроизвести" data-state="play">
+          <svg id="icoPlay" viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="8,5 8,19 18,12" fill="currentColor"></polygon>
+          </svg>
+          <svg id="icoPause" viewBox="0 0 24 24" aria-hidden="true" style="display:none">
+            <rect x="6"  y="5" width="4" height="14" rx="1" fill="currentColor"></rect>
+            <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"></rect>
+          </svg>
+        </button>
+        <!-- Next -->
+        <button id="btnNext" class="icon-btn" aria-label="Следующий трек">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="9,6 17,12 9,18" fill="currentColor"></polygon>
+            <rect x="17" y="5" width="2" height="14" rx="1" fill="currentColor"></rect>
+          </svg>
+        </button>
+        <!-- Add to -->
+        <button id="btnFav" class="pill" style="min-height:30px;font-size:12px">⭐ В избранное</button>
+        <button id="btnAddPl" class="pill" style="min-height:30px;font-size:12px">➕ В плейлист</button>
+        <!-- Close -->
+        <button id="btnClose" class="icon-btn" aria-label="Закрыть плеер">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="bar" id="bar"><div class="p" id="barP"></div></div>
+    <div class="time"><span id="tCur">0:00</span><span id="tDur">0:30</span></div>
+  </div>
+
+  <!-- Статистика -->
+  <dialog id="statsDlg">
+    <h3 id="statsTitle">Локальная статистика</h3>
+    <div id="statsBody"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="closeStats" class="btn">OK</button>
+      <button id="resetStats" class="btn" style="background:linear-gradient(135deg,#ef4444,#f97316)">Сброс</button>
+    </div>
+  </dialog>
+
+  <!-- Scripts in the same order & content as original, just split -->
+  <script src="./main.js"></script>
+  <script src="./saved.js"></script>
+  <script src="./tabs.js"></script>
+
+  <!-- Диалог выбора/создания плейлиста -->
+  <dialog id="plDlg">
+    <h3 style="margin:0 0 8px">Добавить в плейлист</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:320px;max-width:520px">
+      <input id="plSearch" class="select" placeholder="Поиск по плейлистам" />
+      <div id="plList" style="max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:6px"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="plNewName" class="select" placeholder="Название нового плейлиста" />
+        <button id="plCreate" class="btn">Создать</button>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="plCancel" class="btn" style="background:linear-gradient(135deg,#6b7280,#374151)">Отмена</button>
+        <!-- Add to -->
+        <button id="btnFav" class="pill" style="min-height:30px;font-size:12px">⭐ В избранное</button>
+        <button id="btnAddPl" class="pill" style="min-height:30px;font-size:12px">➕ В плейлист</button>
+        <!-- Close -->
+        <button id="btnClose" class="icon-btn" aria-label="Закрыть плеер">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+</body>
+</html>
