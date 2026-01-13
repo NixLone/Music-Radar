@@ -125,6 +125,31 @@ if (el.fAlbum ) el.fAlbum .addEventListener('change', applyFilters);
 if (el.sort   ) el.sort   .addEventListener('change', applyFilters);
 
 function msToMinSec(ms){ if(!ms) return "0:00"; const s=Math.round(ms/1000), m=Math.floor(s/60), ss=String(s%60).padStart(2,'0'); return `${m}:${ss}` }
+function getTrackKey(track){
+  const title = (track.title || track.trackName || '').toLowerCase().trim();
+  const artist = (track.artist || track.artistName || '').toLowerCase().trim();
+  const src = (track.src || '').toLowerCase().trim();
+  const key = src + '::' + title + '__' + artist;
+  return key || undefined;
+}
+function isFavoriteTrack(track){
+  const payload = makeTrackPayload(track);
+  if (window.isFavorite) return window.isFavorite(payload);
+  try{
+    const stored = JSON.parse(localStorage.getItem('favorites') || '[]');
+    const id = getTrackKey(payload);
+    return stored.some((t)=>getTrackKey(t)===id);
+  }catch{
+    return false;
+  }
+}
+function setFavoriteButtonState(button, track){
+  if (!button) return;
+  const active = isFavoriteTrack(track);
+  button.classList.toggle('is-favorite', active);
+  button.textContent = active ? '★ В избранном' : '☆ В избранное';
+  button.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
 
 // Global audio player
 const audio=new Audio(); audio.preload='none';
@@ -143,6 +168,7 @@ function startPlay(i){
   el.pTitle.textContent=it.title||'—'; el.pArtist.textContent=it.artist||''; el.pCover.style.backgroundImage=it.art?`url(${it.art})`:'none';
   el.tCur.textContent=fmt(0); el.tDur.textContent=msToMinSec(it.dur||30000); showPlayer(true);
   addStatPlay(it.title, it.artist);
+  updatePlayerFavButton();
 }
 
 function playTrackDirect(track){
@@ -155,6 +181,7 @@ function playTrackDirect(track){
   const art = track.artwork || track.art; el.pCover.style.backgroundImage = art?`url(${art})`:'none';
   el.tCur.textContent = fmt(0); el.tDur.textContent = msToMinSec(track.dur || 30000);
   showPlayer(true);
+  updatePlayerFavButton();
 }
 window.playTrackDirect = playTrackDirect;
 let __manualTrack=null;
@@ -207,9 +234,11 @@ function render(){
     const cover=document.createElement('div'); cover.className='cover'; if(it.art) cover.style.backgroundImage=`url(${it.art})`;
     const meta=document.createElement('div'); meta.className='meta';
     const t=document.createElement('p'); t.className='title'; t.textContent=it.title||'—';
-    const a=document.createElement('p'); a.className='artist'; a.textContent=it.artist||'';
-    const al=document.createElement('p'); al.className='album'; al.textContent=it.album||'';
-    meta.appendChild(t); meta.appendChild(a); meta.appendChild(al);
+    const sub=document.createElement('p'); sub.className='subtitle';
+    const artist = it.artist || '';
+    const album = it.album || '';
+    sub.textContent = artist && album ? `${artist} • ${album}` : (artist || album);
+    meta.appendChild(t); meta.appendChild(sub);
     top.appendChild(cover); top.appendChild(meta);
     const controls=document.createElement('div'); controls.className='controls';
 
@@ -221,11 +250,13 @@ function render(){
     controls.appendChild(play); controls.appendChild(ya); controls.appendChild(src); controls.appendChild(sp);
 
     // Favorites / Playlist
-    const favBtn=document.createElement('button'); favBtn.className='pill'; favBtn.textContent='⭐ В избранное';
+    const favBtn=document.createElement('button'); favBtn.className='pill fav-toggle'; favBtn.dataset.index = String(idx);
+    setFavoriteButtonState(favBtn, it);
     favBtn.addEventListener('click',()=>{
       const track = makeTrackPayload(it);
-      if (window.addToFavorites) window.addToFavorites(track);
-      else if (window.addToList && window.favorites) window.addToList(window.favorites, track, "favorites");
+      if (window.toggleFavorite) window.toggleFavorite(track);
+      else if (window.addToFavorites) window.addToFavorites(track);
+      setFavoriteButtonState(favBtn, it);
     });
     const plBtn=document.createElement('button'); plBtn.className='pill'; plBtn.textContent='➕ В плейлист';
     plBtn.addEventListener('click',()=>{
@@ -257,25 +288,36 @@ if (el.resetStats) el.resetStats.addEventListener('click',()=>{ state.stats={q:{
 
 setTimeout(()=> el.q && el.q.focus(), 150);
 
-function showTab(tab) {
-  const sections = ['search', 'favorites', 'playlist'];
-  sections.forEach(id => {
-    const elx = document.getElementById('tab-' + id);
-    if (elx) elx.style.display = (id === tab) ? 'block' : 'none';
-  });
-}
-
 // Pagination
 if (el.more) el.more.addEventListener('click', () => { state.page += 1; render(); });
 
 // Player extra buttons
 const btnFav = document.getElementById('btnFav');
 const btnAddPl = document.getElementById('btnAddPl');
+function updatePlayerFavButton(){
+  const current = getCurrentTrack();
+  if (!btnFav) return;
+  if (!current){ btnFav.textContent = '☆ В избранное'; btnFav.classList.remove('is-favorite'); return; }
+  const active = isFavoriteTrack(current);
+  btnFav.classList.toggle('is-favorite', active);
+  btnFav.textContent = active ? '★ В избранном' : '☆ В избранное';
+  btnFav.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
 if (btnFav) btnFav.addEventListener('click', ()=>{
   const t = getCurrentTrack(); if (!t) return;
-  if (window.addToFavorites) window.addToFavorites(t);
+  if (window.toggleFavorite) window.toggleFavorite(t);
+  else if (window.addToFavorites) window.addToFavorites(t);
+  updatePlayerFavButton();
 });
 if (btnAddPl) btnAddPl.addEventListener('click', ()=>{
   const t = getCurrentTrack(); if (!t) return;
   if (window.openPlaylistDialog) window.openPlaylistDialog(t);
+});
+window.addEventListener('favorites:updated', ()=>{
+  document.querySelectorAll('.fav-toggle').forEach((button)=>{
+    const idx = Number(button.dataset.index);
+    const track = state.view[idx];
+    if (track) setFavoriteButtonState(button, track);
+  });
+  updatePlayerFavButton();
 });
