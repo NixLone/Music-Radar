@@ -61,11 +61,18 @@
 
       <div id="results" class="results"></div>
       <div id="moreWrap" style="text-align:center;margin-top:16px;display:none;"><button id="more" class="btn">Показать ещё</button></div>
+      <section id="popularWrap" class="popular">
+        <div class="popular-header">
+          <h3>Популярные треки</h3>
+          <p>Подборка хитов для быстрого старта — можно слушать, добавлять в избранное и в плейлист.</p>
+        </div>
+        <div id="popularResults" class="results results-saved"></div>
+      </section>
     </div>
 
     <div id="tab-favorites" style="display:none;">
       <h3>Избранное</h3>
-      <div id="favorites"></div>
+      <div id="favorites" class="results results-saved"></div>
     </div>
 
     <div id="tab-playlist" style="display:none;">
@@ -79,7 +86,7 @@
 <button id="deletePlBtn" class="btn" style="background:linear-gradient(135deg,#ef4444,#f97316)">Удалить</button>
 <button id="clearPlBtn" class="btn" style="background:linear-gradient(135deg,#f59e0b,#f97316)">Очистить</button>
       </div>
-      <div id="playlistTracks"></div>
+      <div id="playlistTracks" class="results results-saved"></div>
     </div>
 
     <div class="footer" style="text-align:center;color:var(--muted);margin-top:28px;font-size:13px">
@@ -118,7 +125,7 @@
           </svg>
         </button>
         <!-- Add to -->
-        <button id="btnFav" class="pill" style="min-height:30px;font-size:12px">⭐ В избранное</button>
+        <button id="btnFav" class="pill" style="min-height:30px;font-size:12px">☆ В избранное</button>
         <button id="btnAddPl" class="pill" style="min-height:30px;font-size:12px">➕ В плейлист</button>
         <!-- Close -->
         <button id="btnClose" class="icon-btn" aria-label="Закрыть плеер">
@@ -159,15 +166,6 @@
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button id="plCancel" class="btn" style="background:linear-gradient(135deg,#6b7280,#374151)">Отмена</button>
-        <!-- Add to -->
-        <button id="btnFav" class="pill" style="min-height:30px;font-size:12px">⭐ В избранное</button>
-        <button id="btnAddPl" class="pill" style="min-height:30px;font-size:12px">➕ В плейлист</button>
-        <!-- Close -->
-        <button id="btnClose" class="icon-btn" aria-label="Закрыть плеер">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" stroke-width="2" fill="none"/>
-          </svg>
-        </button>
       </div>
     </div>
   </dialog>
