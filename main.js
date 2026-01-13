@@ -8,8 +8,10 @@ const el = {
   q: $('#q'), ac: $('#ac'),
   results: $('#results'), moreWrap: $('#moreWrap'),
   more: $('#moreWrap') ? $('#moreWrap').querySelector('button') : null,
+  brand: document.querySelector('.brand'),
   fArtist: $('#fArtist'), fAlbum: $('#fAlbum'), sort: $('#sort'),
   go: $('#go'), clear: $('#clear'),
+  popularResults: $('#popularResults'),
   player: $('#player'), pCover: $('#pCover'),
   pTitle: $('#pTitle'), pArtist: $('#pArtist'),
   bar: $('#bar'), barP: $('#barP'), tCur: $('#tCur'), tDur: $('#tDur'),
@@ -28,6 +30,7 @@ const state = {
   lang: localStorage.getItem('mf_lang') || 'ru',
   theme: localStorage.getItem('mf_theme') || 'auto',
   results: [], view: [], page: 0, pageSize: 18,
+  popular: [],
   playingIndex: -1,
   stats: JSON.parse(localStorage.getItem('mf_stats') || '{"q":{}, "play":{}}'),
 };
@@ -43,10 +46,30 @@ function applyLang(v){
   if (el.q) el.q.placeholder = v==='ru' ? 'Введите название песни или исполнителя' : 'Type song or artist';
   localStorage.setItem('mf_lang', v);
 }
+
+function clearSearch(){
+  if (el.q) el.q.value='';
+  if (el.results) el.results.innerHTML='';
+  if (el.statusText) el.statusText.textContent=i18n[state.lang].ready;
+  if (el.source) el.source.textContent='';
+  if (el.moreWrap) el.moreWrap.style.display='none';
+  if (el.fArtist) el.fArtist.value='';
+  if (el.fAlbum) el.fAlbum.value='';
+  if (el.sort) el.sort.value='relevance';
+  if (el.ac) el.ac.style.display='none';
+  state.results = [];
+  state.view = [];
+  state.page = 0;
+}
 el.lang.value = state.lang; applyLang(state.lang);
 el.theme.value = state.theme; applyTheme(state.theme);
 el.lang.addEventListener('change',(e)=>{ state.lang=e.target.value; applyLang(state.lang); });
 el.theme.addEventListener('change',(e)=>{ state.theme=e.target.value; applyTheme(state.theme); });
+if (el.brand) el.brand.addEventListener('click', ()=>{
+  if (window.showTab) window.showTab('search');
+  clearSearch();
+  if (el.q) el.q.focus();
+});
 
 function saveStats(){ localStorage.setItem('mf_stats', JSON.stringify(state.stats)); }
 function addStatQuery(q){ const k=q.toLowerCase().trim(); state.stats.q[k]=(state.stats.q[k]||0)+1; saveStats(); }
@@ -125,6 +148,31 @@ if (el.fAlbum ) el.fAlbum .addEventListener('change', applyFilters);
 if (el.sort   ) el.sort   .addEventListener('change', applyFilters);
 
 function msToMinSec(ms){ if(!ms) return "0:00"; const s=Math.round(ms/1000), m=Math.floor(s/60), ss=String(s%60).padStart(2,'0'); return `${m}:${ss}` }
+function getTrackKey(track){
+  const title = (track.title || track.trackName || '').toLowerCase().trim();
+  const artist = (track.artist || track.artistName || '').toLowerCase().trim();
+  const src = (track.src || '').toLowerCase().trim();
+  const key = src + '::' + title + '__' + artist;
+  return key || undefined;
+}
+function isFavoriteTrack(track){
+  const payload = makeTrackPayload(track);
+  if (window.isFavorite) return window.isFavorite(payload);
+  try{
+    const stored = JSON.parse(localStorage.getItem('favorites') || '[]');
+    const id = getTrackKey(payload);
+    return stored.some((t)=>getTrackKey(t)===id);
+  }catch{
+    return false;
+  }
+}
+function setFavoriteButtonState(button, track){
+  if (!button) return;
+  const active = isFavoriteTrack(track);
+  button.classList.toggle('is-favorite', active);
+  button.textContent = active ? '★ В избранном' : '☆ В избранное';
+  button.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
 
 // Global audio player
 const audio=new Audio(); audio.preload='none';
@@ -143,6 +191,7 @@ function startPlay(i){
   el.pTitle.textContent=it.title||'—'; el.pArtist.textContent=it.artist||''; el.pCover.style.backgroundImage=it.art?`url(${it.art})`:'none';
   el.tCur.textContent=fmt(0); el.tDur.textContent=msToMinSec(it.dur||30000); showPlayer(true);
   addStatPlay(it.title, it.artist);
+  updatePlayerFavButton();
 }
 
 function playTrackDirect(track){
@@ -155,6 +204,7 @@ function playTrackDirect(track){
   const art = track.artwork || track.art; el.pCover.style.backgroundImage = art?`url(${art})`:'none';
   el.tCur.textContent = fmt(0); el.tDur.textContent = msToMinSec(track.dur || 30000);
   showPlayer(true);
+  updatePlayerFavButton();
 }
 window.playTrackDirect = playTrackDirect;
 let __manualTrack=null;
@@ -193,50 +243,58 @@ async function doSearch(){
 }
 if (el.go) el.go.addEventListener('click', doSearch);
 if (el.q) el.q.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSearch(); });
-if (el.clear) el.clear.addEventListener('click', ()=>{ el.q.value=''; el.results.innerHTML=''; el.statusText.textContent=i18n[state.lang].ready; el.source.textContent=''; });
+if (el.clear) el.clear.addEventListener('click', clearSearch);
 
 function makeTrackPayload(it){ return { src: it.src, title: it.title, artist: it.artist, album: it.album, previewUrl: it.preview, trackViewUrl: it.page, artwork: it.art, dur: it.dur }; }
+function buildCardControls(it, idx, playHandler, listName){
+  const controls=document.createElement('div'); controls.className='controls';
+  const play=document.createElement('button'); play.className='pill'; play.textContent=it.preview?`► ${msToMinSec(it.dur)}`:'—'; play.disabled=!it.preview;
+  const ya=document.createElement('a'); ya.className='pill'; ya.href=`https://music.yandex.ru/search?text=${encodeURIComponent((it.artist||'')+' '+(it.title||''))}`; ya.target='_blank'; ya.rel='noopener'; ya.textContent='🟡 Яндекс';
+  const src=document.createElement('a'); src.className='pill'; src.href=it.page||'#'; src.target='_blank'; src.rel='noopener'; src.textContent=it.src;
+  const sp=document.createElement('a'); sp.className='pill'; sp.href=`https://open.spotify.com/search/${encodeURIComponent((it.artist||'')+' '+(it.title||''))}`; sp.target='_blank'; sp.rel='noopener'; sp.textContent='🟢 Spotify';
+  controls.appendChild(play); controls.appendChild(ya); controls.appendChild(src); controls.appendChild(sp);
+
+  const favBtn=document.createElement('button'); favBtn.className='pill fav-toggle'; favBtn.dataset.index = String(idx); favBtn.dataset.list = listName || 'search';
+  setFavoriteButtonState(favBtn, it);
+  favBtn.addEventListener('click',()=>{
+    const track = makeTrackPayload(it);
+    if (window.toggleFavorite) window.toggleFavorite(track);
+    else if (window.addToFavorites) window.addToFavorites(track);
+    setFavoriteButtonState(favBtn, it);
+  });
+  const plBtn=document.createElement('button'); plBtn.className='pill'; plBtn.textContent='➕ В плейлист';
+  plBtn.addEventListener('click',()=>{
+    const track = makeTrackPayload(it);
+    if (window.openPlaylistDialog) window.openPlaylistDialog(track);
+  });
+  controls.appendChild(favBtn); controls.appendChild(plBtn);
+  if (playHandler) play.addEventListener('click', playHandler);
+  return controls;
+}
+function createTrackCard(it, idx, playHandler, listName){
+  const card=document.createElement('div'); card.className='card'; card.style.animationDelay=`${Math.min(idx,8)*40}ms`;
+  const top=document.createElement('div'); top.className='top';
+  const cover=document.createElement('div'); cover.className='cover'; if(it.art) cover.style.backgroundImage=`url(${it.art})`;
+  const meta=document.createElement('div'); meta.className='meta';
+  const t=document.createElement('p'); t.className='title'; t.textContent=it.title||'—';
+  const sub=document.createElement('p'); sub.className='subtitle';
+  const artist = it.artist || '';
+  const album = it.album || '';
+  sub.textContent = artist && album ? `${artist} • ${album}` : (artist || album);
+  meta.appendChild(t); meta.appendChild(sub);
+  top.appendChild(cover); top.appendChild(meta);
+  const controls = buildCardControls(it, idx, playHandler, listName);
+  card.appendChild(top); card.appendChild(controls);
+  return card;
+}
 function render(){
   if (!el.results) return;
   el.results.innerHTML='';
   const end = (state.page+1)*state.pageSize;
   const pageItems = state.view.slice(0,end);
   pageItems.forEach((it,idx)=>{
-    const card=document.createElement('div'); card.className='card'; card.style.animationDelay=`${Math.min(idx,8)*40}ms`;
-    const top=document.createElement('div'); top.className='top';
-    const cover=document.createElement('div'); cover.className='cover'; if(it.art) cover.style.backgroundImage=`url(${it.art})`;
-    const meta=document.createElement('div'); meta.className='meta';
-    const t=document.createElement('p'); t.className='title'; t.textContent=it.title||'—';
-    const a=document.createElement('p'); a.className='artist'; a.textContent=it.artist||'';
-    const al=document.createElement('p'); al.className='album'; al.textContent=it.album||'';
-    meta.appendChild(t); meta.appendChild(a); meta.appendChild(al);
-    top.appendChild(cover); top.appendChild(meta);
-    const controls=document.createElement('div'); controls.className='controls';
-
-    const play=document.createElement('button'); play.className='pill'; play.textContent=it.preview?`► ${msToMinSec(it.dur)}`:'—'; play.disabled=!it.preview;
-    const ya=document.createElement('a'); ya.className='pill'; ya.href=`https://music.yandex.ru/search?text=${encodeURIComponent((it.artist||'')+' '+(it.title||''))}`; ya.target='_blank'; ya.rel='noopener'; ya.textContent='🟡 Яндекс';
-    const src=document.createElement('a'); src.className='pill'; src.href=it.page||'#'; src.target='_blank'; src.rel='noopener'; src.textContent=it.src;
-    const sp=document.createElement('a'); sp.className='pill'; sp.href=`https://open.spotify.com/search/${encodeURIComponent((it.artist||'')+' '+(it.title||''))}`; sp.target='_blank'; sp.rel='noopener'; sp.textContent='🟢 Spotify';
-
-    controls.appendChild(play); controls.appendChild(ya); controls.appendChild(src); controls.appendChild(sp);
-
-    // Favorites / Playlist
-    const favBtn=document.createElement('button'); favBtn.className='pill'; favBtn.textContent='⭐ В избранное';
-    favBtn.addEventListener('click',()=>{
-      const track = makeTrackPayload(it);
-      if (window.addToFavorites) window.addToFavorites(track);
-      else if (window.addToList && window.favorites) window.addToList(window.favorites, track, "favorites");
-    });
-    const plBtn=document.createElement('button'); plBtn.className='pill'; plBtn.textContent='➕ В плейлист';
-    plBtn.addEventListener('click',()=>{
-      const track = makeTrackPayload(it);
-      if (window.openPlaylistDialog) window.openPlaylistDialog(track);
-    });
-
-    controls.appendChild(favBtn); controls.appendChild(plBtn);
-
-    card.appendChild(top); card.appendChild(controls); el.results.appendChild(card);
-    play.addEventListener('click',()=> startPlay(idx));
+    const card = createTrackCard(it, idx, ()=> startPlay(idx), 'search');
+    el.results.appendChild(card);
   });
   if (el.moreWrap) el.moreWrap.style.display = end < state.view.length ? 'block' : 'none';
 }
@@ -257,25 +315,66 @@ if (el.resetStats) el.resetStats.addEventListener('click',()=>{ state.stats={q:{
 
 setTimeout(()=> el.q && el.q.focus(), 150);
 
-function showTab(tab) {
-  const sections = ['search', 'favorites', 'playlist'];
-  sections.forEach(id => {
-    const elx = document.getElementById('tab-' + id);
-    if (elx) elx.style.display = (id === tab) ? 'block' : 'none';
-  });
-}
-
 // Pagination
 if (el.more) el.more.addEventListener('click', () => { state.page += 1; render(); });
 
 // Player extra buttons
 const btnFav = document.getElementById('btnFav');
 const btnAddPl = document.getElementById('btnAddPl');
+function updatePlayerFavButton(){
+  const current = getCurrentTrack();
+  if (!btnFav) return;
+  if (!current){ btnFav.textContent = '☆ В избранное'; btnFav.classList.remove('is-favorite'); return; }
+  const active = isFavoriteTrack(current);
+  btnFav.classList.toggle('is-favorite', active);
+  btnFav.textContent = active ? '★ В избранном' : '☆ В избранное';
+  btnFav.setAttribute('aria-pressed', active ? 'true' : 'false');
+}
 if (btnFav) btnFav.addEventListener('click', ()=>{
   const t = getCurrentTrack(); if (!t) return;
-  if (window.addToFavorites) window.addToFavorites(t);
+  if (window.toggleFavorite) window.toggleFavorite(t);
+  else if (window.addToFavorites) window.addToFavorites(t);
+  updatePlayerFavButton();
 });
 if (btnAddPl) btnAddPl.addEventListener('click', ()=>{
   const t = getCurrentTrack(); if (!t) return;
   if (window.openPlaylistDialog) window.openPlaylistDialog(t);
 });
+window.addEventListener('favorites:updated', ()=>{
+  document.querySelectorAll('.fav-toggle').forEach((button)=>{
+    const idx = Number(button.dataset.index);
+    const list = button.dataset.list;
+    const track = list === 'popular' ? state.popular[idx] : state.view[idx];
+    if (track) setFavoriteButtonState(button, track);
+  });
+  updatePlayerFavButton();
+});
+
+async function loadPopularTracks(){
+  if (!el.popularResults) return;
+  try{
+    const popular = await jsonp('https://itunes.apple.com/search?term=top%20hits&entity=song&limit=8','callback');
+    const items = (popular.results||[]).map((x)=>({
+      src:'Apple',
+      title:x.trackName,
+      artist:x.artistName,
+      album:x.collectionName,
+      preview:x.previewUrl,
+      art:(x.artworkUrl100||'').replace('100x100bb','300x300bb'),
+      dur:x.trackTimeMillis||30000,
+      page:x.trackViewUrl,
+    }));
+    state.popular = items;
+    el.popularResults.innerHTML = '';
+    items.forEach((it, idx)=>{
+      const payload = { src: it.src, title: it.title, artist: it.artist, album: it.album, previewUrl: it.preview, trackViewUrl: it.page, artwork: it.art, dur: it.dur };
+      const card = createTrackCard(it, idx, ()=> playTrackDirect(payload), 'popular');
+      el.popularResults.appendChild(card);
+    });
+  }catch(e){
+    el.popularResults.innerHTML = '<div class="error">Не удалось загрузить популярные треки. Проверьте соединение.</div>';
+    console.error(e);
+  }
+}
+
+loadPopularTracks();
