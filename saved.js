@@ -7,6 +7,7 @@
 let __favRaw = localStorage.getItem("favorites");
 try{ window.favorites = __favRaw ? JSON.parse(__favRaw) : []; }catch(e){ window.favorites = []; localStorage.setItem("favorites","[]"); }
 function saveFavorites(){ localStorage.setItem("favorites", JSON.stringify(window.favorites)); }
+function notifyFavoritesUpdate(){ window.dispatchEvent(new CustomEvent('favorites:updated')); }
 
 // Playlists — object { name: Track[] }
 (function migratePlaylists(){
@@ -45,7 +46,26 @@ window.addToFavorites = function(track){ track = normalizeTrackFields(track);
     window.favorites.push(track);
     saveFavorites();
     renderSaved(window.favorites, 'favorites');
+    notifyFavoritesUpdate();
   }
+}
+window.isFavorite = function(track){
+  const id = getTrackId(track);
+  return window.favorites.some(t=>getTrackId(t)===id);
+}
+window.toggleFavorite = function(track){
+  track = normalizeTrackFields(track);
+  const id = getTrackId(track);
+  const idx = window.favorites.findIndex(t=>getTrackId(t)===id);
+  if (idx > -1) {
+    window.favorites.splice(idx, 1);
+  } else {
+    window.favorites.push(track);
+  }
+  saveFavorites();
+  renderSaved(window.favorites, 'favorites');
+  notifyFavoritesUpdate();
+  return idx === -1;
 }
 
 window.openPlaylistDialog = function(track){
@@ -109,7 +129,12 @@ function renderSaved(list, containerId){
     const id = getTrackId(track);
     rm.addEventListener('click', ()=>{
       const idx = window.favorites.findIndex(t=>getTrackId(t)===id);
-      if (idx>-1){ window.favorites.splice(idx,1); saveFavorites(); renderSaved(window.favorites, 'favorites'); }
+      if (idx>-1){
+        window.favorites.splice(idx,1);
+        saveFavorites();
+        renderSaved(window.favorites, 'favorites');
+        notifyFavoritesUpdate();
+      }
     });
     buttons.appendChild(rm);
 
